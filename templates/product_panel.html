@@ -1,0 +1,128 @@
+<dialog class="drawer{% if action == 'delete' %} confirmation{% endif %}" data-panel data-return-url="{{ return_url }}" open aria-labelledby="panel-title">
+    <header class="drawer-header">
+        <div>
+            <h2 id="panel-title">{{ action_label }}</h2>
+            {% if product %}<p>{{ product.name }} <span class="product-id">#{{ product.id }}</span></p>{% endif %}
+        </div>
+        <a class="close-button" data-panel-close href="{{ return_url }}" aria-label="Close {{ action_label | lower }}">×</a>
+    </header>
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    {% if action not in ['new', 'add-category'] and not product %}
+    <div class="drawer-content">
+        <p>This product may have been removed. Return to the list to choose another product.</p>
+        <a class="button secondary" data-panel-close href="{{ return_url }}">Back to list</a>
+    </div>
+    {% elif action == 'view' %}
+    <div class="drawer-content">
+        <dl class="product-details">
+            <div><dt>Category</dt><dd>{{ product.category or 'Uncategorized' }}</dd></div>
+            <div><dt>Stock unit</dt><dd>{{ product.unit }}</dd></div>
+            <div><dt>Unit price</dt><dd>{{ product.price | money }} / {{ product.unit }}</dd></div>
+            <div><dt>On hand</dt><dd>{{ product.quantity | quantity(product.unit) }}</dd></div>
+            <div><dt>Minimum stock</dt><dd>{{ product.min_stock | quantity(product.unit) }}</dd></div>
+            <div><dt>Status</dt><dd>{% if product.low_stock %}<span class="badge low">Low stock</span>{% else %}<span class="badge regular">In stock range</span>{% endif %}</dd></div>
+        </dl>
+        <div class="detail-actions">
+            <a class="button primary" data-panel-link href="{{ filters.url(action='edit', id=product.id) }}">Edit product</a>
+            <a class="button secondary" data-panel-link href="{{ filters.url(action='add-stock', id=product.id) }}">Add stock</a>
+            <a class="button secondary" data-panel-link href="{{ filters.url(action='remove-stock', id=product.id) }}">Remove stock</a>
+            <a class="button secondary" data-panel-link href="{{ filters.url(action='sale', id=product.id) }}">Record sale</a>
+            <a class="button secondary" data-panel-link href="{{ filters.url(action='history', id=product.id) }}">Stock History</a>
+            <a class="button danger-outline" data-panel-link href="{{ filters.url(action='delete', id=product.id) }}">Delete product</a>
+        </div>
+    </div>
+    {% elif action == 'history' %}
+    <div class="drawer-content">
+        {% if movements %}
+        <div class="table-scroll" tabindex="0" aria-label="Stock movement history">
+            <table>
+                <thead><tr><th scope="col">Time (PKT)</th><th scope="col">Movement</th><th scope="col">Change</th><th scope="col">Balance</th><th scope="col">Note</th></tr></thead>
+                <tbody>
+                    {% for occurred, kind, change, unit, note, balance in movements %}
+                    <tr><td>{{ occurred.strftime('%d %b %Y, %H:%M:%S') }}</td><td>{{ kind | title }}</td><td class="number">{{ '+' if change > 0 else '−' }}{{ (change | abs) | quantity(unit) }}</td><td class="number">{{ balance | quantity(unit) }}</td><td>{{ note or '—' }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No stock movements recorded yet.</p>
+        {% endif %}
+        <div class="drawer-footer">
+            <a class="button secondary" data-panel-link href="{{ filters.url(action='view', id=product.id) }}">Product details</a>
+        </div>
+    </div>
+    {% else %}
+    <form class="drawer-content" method="post" action="{{ action_url }}" data-inventory-form>
+        {% if action == 'add-category' %}
+        <label>Category name
+            <input name="category" value="{{ entries.get('category', '') }}" maxlength="100" required {% if error and error.field == 'category' %}aria-invalid="true"{% endif %}>
+        </label>
+        {% elif action in ['new', 'edit'] %}
+        <div class="form-grid">
+            <label class="wide">Product name
+                <input name="name" value="{{ entries.get('name', '') }}" maxlength="100" required {% if error and error.field == 'name' %}aria-invalid="true"{% endif %}>
+            </label>
+            <label>Unit price (PKR)
+                <input type="number" name="price" min="0" max="99999999.99" step="0.01" inputmode="decimal" value="{{ entries.get('price', '') }}" required {% if error and error.field == 'price' %}aria-invalid="true"{% endif %}>
+            </label>
+            {% if action == 'new' %}
+            <label>Stock unit
+                <select name="unit" data-unit-select required {% if error and error.field == 'unit' %}aria-invalid="true"{% endif %}>
+                    {% for unit, step in unit_steps.items() %}
+                    <option value="{{ unit }}" data-step="{{ step }}" {% if entries.get('unit') == unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Quantity
+                <input type="number" name="quantity" min="0" max="9999999999.999" step="{{ unit_steps.get(entries.get('unit'), 1) }}" inputmode="decimal" value="{{ entries.get('quantity', '') }}" data-stock-field required {% if error and error.field == 'quantity' %}aria-invalid="true"{% endif %}>
+            </label>
+            {% else %}
+            <label>Stock unit <input value="{{ product.unit }}" readonly></label>
+            <label>On hand <input value="{{ product.quantity | quantity(product.unit) }}" readonly></label>
+            {% endif %}
+            <label>Minimum stock
+                <input type="number" name="min_stock" min="0" max="9999999999.999" step="{{ unit_steps.get(product.unit if product else entries.get('unit'), 1) }}" inputmode="decimal" value="{{ entries.get('min_stock', '') }}" data-stock-field required {% if error and error.field == 'min_stock' %}aria-invalid="true"{% endif %}>
+            </label>
+            <label class="wide">Category <span class="optional">Optional</span>
+                <input name="category" value="{{ entries.get('category', '') }}" maxlength="100" list="category-suggestions" {% if error and error.field == 'category' %}aria-invalid="true"{% endif %}>
+                <datalist id="category-suggestions">
+                    {% for category in categories %}<option value="{{ category }}"></option>{% endfor %}
+                </datalist>
+            </label>
+        </div>
+        {% if action == 'new' %}
+            {% if category_notice %}<p class="field-hint" role="status">{{ category_notice }}</p>
+            {% else %}<p class="field-hint">Choose Add category to save the category name before saving your product.</p>{% endif %}
+        {% endif %}
+        {% elif action == 'delete' %}
+        <p class="confirm-text">Delete <strong>{{ product.name }}</strong> from your inventory?</p>
+        <p class="muted">Products with sales or stock movement history are protected.</p>
+        {% else %}
+        {% if action == 'sale' %}
+        <input type="hidden" name="request_id" value="{{ entries.get('request_id') }}">
+        <p class="muted">{{ product.price | money }} / {{ product.unit }}</p>
+        {% endif %}
+        <div class="stock-preview" data-stock-preview data-current="{{ product.quantity }}" data-unit="{{ product.unit }}" data-direction="{{ 'add' if action in ['add-stock', 'restock'] else 'subtract' }}">
+            <div><span>Current quantity</span><strong>{{ product.quantity | quantity(product.unit) }}</strong></div>
+            <div><span>After this action</span><strong data-result aria-live="polite">—</strong></div>
+        </div>
+        <label class="amount-field">Amount ({{ product.unit }})
+            <input type="number" name="amount" min="{{ unit_steps[product.unit] }}" step="{{ unit_steps[product.unit] }}" max="{{ '9999999999.999' if action in ['add-stock', 'restock'] else product.quantity }}" value="{{ entries.get('amount', '') }}" inputmode="decimal" {% if error and error.field == 'amount' %}aria-invalid="true"{% endif %} required>
+        </label>
+        <p class="field-hint">{% if product.unit == 'kg' %}Enter kilograms to three decimal places.{% elif product.unit == 'dozen' %}Enter whole or half dozens.{% else %}Enter whole pieces or packages.{% endif %}</p>
+        {% if action != 'sale' %}
+        <label class="amount-field">Note (optional)
+            <input name="note" maxlength="250" value="{{ entries.get('note', '') }}" {% if error and error.field == 'note' %}aria-invalid="true"{% endif %}>
+        </label>
+        {% endif %}
+        {% endif %}
+        <div class="drawer-footer">
+            <a href="{{ return_url }}" class="button secondary" data-panel-close>Cancel</a>
+            <button type="submit" class="button {{ 'danger' if action == 'delete' else 'primary' }}">{{ 'Save changes' if action == 'edit' else action_label }}</button>
+            {% if action == 'new' %}
+            <button type="submit" class="button secondary" name="intent" value="add-category" formnovalidate>Add category</button>
+            {% endif %}
+        </div>
+    </form>
+    {% endif %}
+</dialog>

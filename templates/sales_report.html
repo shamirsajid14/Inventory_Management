@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-header">
+    <div><h1>Sales Reports</h1><p>Date ranges use Pakistan time (Asia/Karachi).</p></div>
+    <div class="page-actions">
+        {% if export_url %}<a class="button primary" href="{{ export_url }}">Export CSV</a>{% endif %}
+        <a class="button secondary" href="/admin/sales">Sales history</a>
+    </div>
+</header>
+<section class="surface">
+    <form class="filters" action="/admin/sales/reports" method="get">
+        <label>Start date<input type="date" name="start" value="{{ start }}" required></label>
+        <label>End date<input type="date" name="end" value="{{ end }}" required></label>
+        <button class="button secondary" type="submit">Apply</button>
+    </form>
+    {% if report_error %}<p class="form-error" role="alert">{{ report_error }}</p>{% endif %}
+</section>
+{% if total is defined %}
+<section class="metrics report-section" aria-label="Sales report totals">
+    <article class="metric"><span class="metric-label">Recorded sales</span><strong>{{ total.sales }}</strong></article>
+    <article class="metric metric-value"><span class="metric-label">Known revenue</span><strong>{{ total.revenue | money }}</strong></article>
+    <article class="metric"><span class="metric-label">Quantity sold by unit</span>
+        {% for unit, amount in total.quantities.items() %}<span>{{ amount | quantity(unit) }}</span>{% endfor %}
+    </article>
+</section>
+{% if total.missing %}
+<p class="notification" role="status">{{ total.missing }} sale(s) lack a recorded price. Sale counts include them. Revenue includes sales with a recorded price.</p>
+{% endif %}
+<section class="surface report-section">
+    <div class="surface-heading"><h2>Daily revenue</h2></div>
+    {% if daily %}
+    <div class="table-scroll" tabindex="0" aria-label="Daily revenue">
+        <table>
+            <thead><tr><th scope="col">Date</th><th scope="col">Sales</th><th scope="col">Known revenue</th><th scope="col">Kg sold</th><th scope="col">Dozen sold</th><th scope="col">Pieces sold</th></tr></thead>
+            <tbody>
+                {% for day, summary in daily.items() %}
+                <tr><th scope="row">{{ day.isoformat() }}</th><td>{{ summary.sales }}</td><td>{{ summary.revenue | money }}</td>
+                    {% for unit, amount in summary.quantities.items() %}<td>{{ amount | quantity(unit) }}</td>{% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}<div class="empty"><p>No sales in this date range.</p></div>{% endif %}
+</section>
+<section class="surface report-section">
+    <div class="surface-heading"><h2>Top products by revenue</h2></div>
+    {% if top %}
+    <div class="table-scroll" tabindex="0" aria-label="Top products">
+        <table>
+            <thead><tr><th scope="col">Product</th><th scope="col">Known revenue</th></tr></thead>
+            <tbody>{% for (product_id, name), revenue in top %}
+                <tr><th scope="row"><a class="product-name" data-panel-link href="/admin/products?action=view&amp;id={{ product_id }}">{{ name }}</a></th><td>{{ revenue | money }}</td></tr>
+            {% endfor %}</tbody>
+        </table>
+    </div>
+    {% else %}<div class="empty"><p>Product rankings appear when sales with recorded prices are available.</p></div>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

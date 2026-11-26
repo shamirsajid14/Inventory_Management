@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-header">
+    <div>
+        <h1>Sales</h1>
+        <p>Review recorded sales and the prices charged at the time.</p>
+    </div>
+    <div class="page-actions">
+        <a class="button primary" href="/admin/sales/reports">Sales Reports</a>
+        <a class="button secondary" href="/admin/products">Find a product</a>
+    </div>
+</header>
+<section class="metrics" aria-label="Sales summary">
+    <article class="metric"><span class="metric-label">Recorded sales</span><strong>{{ "{:,}".format(summary[0]) }}</strong></article>
+    <article class="metric metric-value"><span class="metric-label">Gross sales</span><strong>{{ summary[1] | money }}</strong></article>
+    <article class="metric"><span class="metric-label">Products sold</span><strong>{{ "{:,}".format(summary[2]) }}</strong></article>
+</section>
+<section class="surface" aria-labelledby="sales-heading">
+    <div class="surface-heading"><h2 id="sales-heading">Sales history</h2><span class="result-count">Pakistan time</span></div>
+    {% if results.items %}
+    <div class="table-scroll" tabindex="0" aria-label="Sales history table">
+        <table>
+            <thead>
+                <tr><th scope="col">Sale</th><th scope="col">Product</th><th scope="col" class="number">Quantity</th><th scope="col" class="number">Unit price</th><th scope="col" class="number">Total</th><th scope="col">Sold at (PKT)</th></tr>
+            </thead>
+            <tbody>
+                {% for sale in results.items %}
+                <tr>
+                    <th scope="row">#{{ sale.id }}</th>
+                    <td><a class="product-name" data-panel-link href="/admin/products?action=view&amp;id={{ sale.product_id }}">{{ sale.name }}</a><span class="product-id">#{{ sale.product_id }}</span></td>
+                    <td class="number">{{ sale.quantity | quantity(sale.unit) }}</td>
+                    <td class="number">{{ sale.unit_price | money }} <span class="unit-price">/ {{ sale.unit }}</span></td>
+                    <td class="number stock-number">{{ sale.total | money }}</td>
+                    <td>{{ sale.sold_at.strftime('%d %b %Y, %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><h3>No sales recorded yet</h3><p>Open a product and choose Record sale to start.</p><a class="button secondary" href="/admin/products">Browse products</a></div>
+    {% endif %}
+    {% if results.pages > 1 %}
+    <nav class="pagination" aria-label="Sales pages">
+        <span>Page {{ results.number }} of {{ results.pages }}</span>
+        <div>
+            {% if results.number > 1 %}<a class="button secondary" href="?page={{ results.number - 1 }}">Previous</a>{% endif %}
+            {% if results.number < results.pages %}<a class="button secondary" href="?page={{ results.number + 1 }}">Next</a>{% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

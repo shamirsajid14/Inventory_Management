@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-header">
+    <div>
+        <h1>{{ section }}</h1>
+        <p>{% if section == 'Dashboard' %}Manage your grocery inventory from one place.{% elif section == 'Stock' %}Review quantities and update stock by product.{% else %}Browse, add, and edit inventory products.{% endif %}</p>
+    </div>
+    <div class="page-actions">
+        <a class="button primary" data-panel-link href="{{ filters.url(action='new') }}"><span aria-hidden="true">+</span> Add product</a>
+        <a class="button secondary" data-panel-link href="{{ filters.url(action='add-category') }}">Add category</a>
+    </div>
+</header>
+
+{% if summary is defined %}
+<section class="metrics" aria-label="Inventory summary">
+    <article class="metric">
+        <span class="metric-label">Total products</span>
+        <strong>{{ "{:,}".format(summary[0]) }}</strong>
+        <span class="metric-caption">Across all categories</span>
+    </article>
+    <a class="metric metric-alert" href="/admin/products?low=1">
+        <span class="metric-label">Low-stock products</span>
+        <strong>{{ "{:,}".format(summary[1]) }}</strong>
+        <span class="metric-caption">View below minimum stock</span>
+    </a>
+    <article class="metric metric-value">
+        <span class="metric-label">Total inventory value</span>
+        <strong>{{ summary[2] | money }}</strong>
+        <span class="metric-caption">Current price × stock on hand</span>
+    </article>
+</section>
+{% endif %}
+
+<section class="surface" aria-labelledby="inventory-heading">
+    <div class="surface-heading">
+        <h2 id="inventory-heading">{{ "Restock queue" if filters.low else "Stock levels" if section == "Stock" else "Product inventory" }}</h2>
+        <span class="result-count">{{ "{:,}".format(results.total) }} {{ 'product' if results.total == 1 else 'products' }}</span>
+    </div>
+    <form class="filters" action="{{ filters.path }}" method="get" aria-label="Filter products">
+        <label class="filter-search">Search
+            <input type="search" name="q" value="{{ filters.search }}" maxlength="100" placeholder="Product name or exact ID">
+        </label>
+        <label>Category
+            <select name="category">
+                <option value="">All categories</option>
+                {% for category in categories %}
+                <option value="{{ category }}" {% if filters.category | lower == category | lower %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Unit
+            <select name="unit">
+                <option value="">All units</option>
+                {% for unit in unit_steps %}
+                <option value="{{ unit }}" {% if filters.unit == unit %}selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Sort by
+            <select name="sort">
+                {% for sort, label in sort_labels.items() %}
+                <option value="{{ sort }}" {% if filters.sort == sort %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="filter-controls">
+            <label class="checkbox"><input type="checkbox" name="low" value="1" {% if filters.low %}checked{% endif %}> Low stock</label>
+            <button type="submit" class="button secondary">Apply</button>
+            {% if filters.search or filters.category or filters.unit or filters.low or filters.sort != 'name' %}
+            <a class="text-link" href="{{ filters.path }}">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+    {% if results.items %}
+    <div class="table-scroll" tabindex="0" aria-label="Product inventory table">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Product</th><th scope="col">Category</th>
+                    <th scope="col" class="number">Unit price</th><th scope="col" class="number">On hand</th>
+                    <th scope="col" class="number">Minimum</th>
+                    {% if filters.low %}<th scope="col" class="number">Needed</th>{% endif %}
+                    <th scope="col">Status</th>
+                    <th scope="col" class="actions-column">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in results.items %}
+                <tr>
+                    <th scope="row">
+                        <a class="product-name" data-panel-link href="{{ filters.url(action='view', id=product.id) }}">{{ product.name }}</a>
+                        <span class="product-id">#{{ product.id }}</span>
+                    </th>
+                    <td>{{ product.category or '—' }}</td>
+                    <td class="number">{{ product.price | money }} <span class="unit-price">/ {{ product.unit }}</span></td>
+                    <td class="number stock-number">{{ product.quantity | quantity(product.unit) }}</td>
+                    <td class="number">{{ product.min_stock | quantity(product.unit) }}</td>
+                    {% if filters.low %}<td class="number stock-number">{{ product.restock_amount | quantity(product.unit) }}</td>{% endif %}
+                    <td>
+                        {% if product.low_stock %}<span class="badge low">Low stock</span>
+                        {% else %}<span class="badge regular">In stock range</span>{% endif %}
+                    </td>
+                    <td class="actions-column">
+                        <div class="row-actions">
+                            {% if filters.low %}
+                            <a class="row-button manage-button" data-panel-link href="{{ filters.url(action='restock', id=product.id) }}" aria-label="Restock {{ product.name }}">Restock</a>
+                            {% elif section == 'Stock' %}
+                            <a class="row-button" data-panel-link href="{{ filters.url(action='add-stock', id=product.id) }}" aria-label="Add stock for {{ product.name }}">Add stock</a>
+                            <a class="row-button" data-panel-link href="{{ filters.url(action='remove-stock', id=product.id) }}" aria-label="Remove stock for {{ product.name }}">Remove</a>
+                            {% else %}
+                            <a class="row-button" data-panel-link href="{{ filters.url(action='edit', id=product.id) }}" aria-label="Edit {{ product.name }}">Edit</a>
+                            <a class="row-button manage-button" data-panel-link href="{{ filters.url(action='view', id=product.id) }}" aria-label="Manage {{ product.name }}">Manage</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        {% if filters.search or filters.category or filters.unit or filters.low %}
+        <h3>No products match</h3>
+        <p>Try a different name or clear the filters.</p>
+        <a class="button secondary" href="{{ filters.path }}">Clear filters</a>
+        {% else %}
+        <h3>Your inventory is empty</h3>
+        <p>Add a product to start tracking stock.</p>
+        <a class="button primary" data-panel-link href="{{ filters.url(action='new') }}">Add product</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if results.pages > 1 %}
+    <nav class="pagination" aria-label="Product pages">
+        <span>Page {{ results.number }} of {{ results.pages }}</span>
+        <div>
+            {% if results.number > 1 %}<a class="button secondary" href="{{ filters.url(page=results.number - 1) }}">Previous</a>{% endif %}
+            {% if results.number < results.pages %}<a class="button secondary" href="{{ filters.url(page=results.number + 1) }}">Next</a>{% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

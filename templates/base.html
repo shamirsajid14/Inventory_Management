@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ section }} · Inventory Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/admin.css') }}">
+    <script defer src="{{ url_for('static', path='/admin.js') }}"></script>
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <aside class="sidebar">
+        <a class="brand" href="/admin">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span><strong>Inventory</strong><small>Grocery admin</small></span>
+        </a>
+        <nav class="navigation" aria-label="Main navigation">
+            {% for title, path, glyph in [
+                ('Dashboard', '/admin', 'dashboard'), ('Products', '/admin/products', 'products'),
+                ('Stock', '/admin/stock', 'stock'), ('Sales', '/admin/sales', 'sales')
+            ] %}
+            <a href="{{ path }}" {% if title == section %}aria-current="page"{% endif %}>
+                <span class="nav-icon icon-{{ glyph }}" aria-hidden="true"></span>{{ title }}
+            </a>
+            {% endfor %}
+        </nav>
+    </aside>
+    <main id="main" class="workspace">
+        {% if notice %}
+        <div class="notification" role="status">
+            <span class="notice-icon" aria-hidden="true">✓</span>
+            <span>{{ notice }}</span>
+            <button type="button" data-dismiss-notice aria-label="Dismiss notification">×</button>
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+    <div id="panel-root">{% if action %}{% include 'product_panel.html' %}{% endif %}</div>
+</body>
+</html>
